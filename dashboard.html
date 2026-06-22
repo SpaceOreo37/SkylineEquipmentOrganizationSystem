@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Skyline EOS — Dashboard</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <header>
+    <span class="logo">Skyline EOS</span>
+    <div class="header-right">
+      <span id="user-email"></span>
+      <button id="sign-out-btn">Sign out</button>
+    </div>
+  </header>
+
+  <main>
+    <h2>Equipment</h2>
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Category</th>
+            <th>Status</th>
+            <th>Location</th>
+          </tr>
+        </thead>
+        <tbody id="equipment-tbody">
+          <tr><td colspan="4" class="loading">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  <script type="module" src="js/dashboard.js"></script>
+</body>
+</html>
