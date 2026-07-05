@@ -1,0 +1,8 @@
+node_modules/
+data/*.csv
+data/*.json
+data/import_progress.json
+*serviceAccount*.json
+*adminsdk*.json
+.env
+.DS_Store
