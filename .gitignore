@@ -1,9 +1,8 @@
-# Generated import data and raw spreadsheet exports
-data/*.json
-data/*.csv
-
-# Node
 node_modules/
-
-# Firebase service account keys — never commit credentials
+data/*.csv
+data/*.json
 *serviceAccount*.json
+*adminsdk*.json
+.env
+.DS_Store
+.gstack/

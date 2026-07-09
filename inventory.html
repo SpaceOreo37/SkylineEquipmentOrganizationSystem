@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Skyline EOS — Inventory</title>
+  <link rel="stylesheet" href="styles.css?v=3">
+</head>
+<body>
+
+  <header>
+    <span class="logo">Skyline EOS</span>
+    <div class="header-right">
+      <span id="user-email"></span>
+      <button id="sign-out-btn">Sign out</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="inventory-toolbar">
+      <h2>Inventory</h2>
+      <input type="search" id="search-input" placeholder="Search all equipment…"
+             aria-label="Search all equipment" autocomplete="off">
+    </div>
+
+    <p id="inventory-status" class="status">Loading inventory…</p>
+    <div id="content" aria-live="polite"></div>
+  </main>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <!-- Bump ?v= when page structure and script change together (cache busting) -->
+  <script type="module" src="js/inventory.js?v=3"></script>
+</body>
+</html>

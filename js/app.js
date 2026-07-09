@@ -1,10 +1,10 @@
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js';
-import { auth } from './firebase-init.js';
-import { signIn } from './auth.js';
+import { auth } from './firebase-init.js?v=3';
+import { signIn } from './auth.js?v=3';
 
-// Already logged in — skip straight to dashboard
+// Already logged in — skip straight to the inventory
 onAuthStateChanged(auth, (user) => {
-  if (user) window.location.href = 'dashboard.html';
+  if (user) window.location.href = 'inventory.html';
 });
 
 const loginForm = document.getElementById('login-form');
