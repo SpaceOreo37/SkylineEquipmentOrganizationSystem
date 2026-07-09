@@ -7,7 +7,7 @@ import {
   query,
   where,
 } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js';
-import { db } from './firebase-init.js';
+import { db } from './firebase-init.js?v=3';
 
 export async function getEquipment() {
   const q = query(collection(db, 'equipment'), orderBy('name'));
@@ -29,6 +29,19 @@ export function subscribeEquipmentTypes(onTypes, onError) {
     (snap) => onTypes(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
     onError
   );
+}
+
+/**
+ * One-time fetch of the equipmentTypes in a single section. Fallback for
+ * deep links / refreshes on the section page when the sessionStorage
+ * handoff from the main inventory page is empty. Reads only that
+ * section's type documents. Sorted client-side to avoid needing a
+ * composite index.
+ */
+export async function getEquipmentTypesBySection(section) {
+  const q = query(collection(db, 'equipmentTypes'), where('section', '==', section));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
 /**

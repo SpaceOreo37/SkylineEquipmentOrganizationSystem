@@ -1,7 +1,7 @@
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js';
-import { auth } from './firebase-init.js';
-import { signOut } from './auth.js';
-import { getEquipment } from './firestore.js';
+import { auth } from './firebase-init.js?v=3';
+import { signOut } from './auth.js?v=3';
+import { getEquipment } from './firestore.js?v=3';
 
 const tbody = document.getElementById('equipment-tbody');
 

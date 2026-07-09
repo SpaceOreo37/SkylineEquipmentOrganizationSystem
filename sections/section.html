@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Skyline EOS — Inventory</title>
-  <link rel="stylesheet" href="styles.css?v=3">
+  <title>Skyline EOS — Section</title>
+  <link rel="stylesheet" href="../styles.css?v=3">
 </head>
 <body>
 
@@ -17,19 +17,18 @@
   </header>
 
   <main>
-    <div class="inventory-toolbar">
-      <h2>Inventory</h2>
-      <input type="search" id="search-input" placeholder="Search all equipment…"
-             aria-label="Search all equipment" autocomplete="off">
+    <div class="page-head">
+      <a class="back-btn" href="../inventory.html">← All sections</a>
+      <h2 id="section-title">Section</h2>
     </div>
 
-    <p id="inventory-status" class="status">Loading inventory…</p>
-    <div id="content" aria-live="polite"></div>
+    <p id="section-status" class="status">Loading equipment…</p>
+    <div id="type-list" aria-live="polite"></div>
   </main>
 
   <div id="toast" class="toast" hidden></div>
 
   <!-- Bump ?v= when page structure and script change together (cache busting) -->
-  <script type="module" src="js/inventory.js?v=3"></script>
+  <script type="module" src="../js/section.js?v=3"></script>
 </body>
 </html>
