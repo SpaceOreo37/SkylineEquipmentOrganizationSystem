@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Skyline EOS — Check Out</title>
+  <link rel="stylesheet" href="styles.css?v=5">
+</head>
+<body>
+
+  <header>
+    <span class="logo">Skyline EOS</span>
+    <div class="header-right">
+      <span id="user-email"></span>
+      <button id="sign-out-btn">Sign out</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="page-head">
+      <a class="back-btn" href="inventory.html">← Inventory</a>
+      <h2>Check Out Equipment</h2>
+    </div>
+
+    <p id="checkout-status" class="status">Loading…</p>
+
+    <form id="checkout-form" class="checkout-form" novalidate hidden>
+      <label for="type-search">Equipment</label>
+      <div class="combobox">
+        <input type="text" id="type-search" placeholder="Search equipment…"
+               autocomplete="off" role="combobox"
+               aria-expanded="false" aria-controls="type-options">
+        <div id="type-options" class="combobox__options" hidden></div>
+      </div>
+      <p id="availability" class="availability" hidden aria-live="polite"></p>
+
+      <label for="quantity">Quantity</label>
+      <input type="number" id="quantity" min="1" step="1" value="1" inputmode="numeric">
+      <p id="distribution-note" class="distribution-note" hidden aria-live="polite"></p>
+
+      <label for="return-date">Expected return date</label>
+      <input type="date" id="return-date">
+
+      <label for="notes">Notes <span class="optional">(optional)</span></label>
+      <textarea id="notes" rows="3" placeholder="e.g. Period 3 chemistry lab"></textarea>
+
+      <button type="submit" id="submit-btn" disabled>Check Out</button>
+      <p id="form-error" class="error" hidden></p>
+    </form>
+
+    <div id="success-view" class="success-card" hidden aria-live="polite"></div>
+  </main>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <!-- Bump ?v= when page structure and script change together (cache busting) -->
+  <script type="module" src="js/checkout.js?v=5"></script>
+</body>
+</html>

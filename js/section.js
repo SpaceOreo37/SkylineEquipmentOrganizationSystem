@@ -1,14 +1,13 @@
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js';
-import { auth } from './firebase-init.js?v=3';
-import { signOut } from './auth.js?v=3';
-import { getEquipmentTypesBySection } from './firestore.js?v=3';
+import { auth } from './firebase-init.js?v=5';
+import { signOut } from './auth.js?v=5';
+import { getEquipmentTypesBySection } from './firestore.js?v=5';
 import {
   esc,
-  showToast,
   loadTypesFromSession,
   countsHtml,
   createCountPool,
-} from './ui-common.js?v=3';
+} from './ui-common.js?v=5';
 
 const titleEl = document.getElementById('section-title');
 const statusEl = document.getElementById('section-status');
@@ -180,7 +179,11 @@ listEl.addEventListener('click', (e) => {
     return;
   }
   if (e.target.closest('[data-checkout]')) {
-    // Stub — checkout flow is built separately.
-    showToast('Checkout is coming soon.');
+    const typeId = e.target.closest('[data-type-id]').dataset.typeId;
+    const type = state.types.find((t) => t.id === typeId);
+    if (!type) return;
+    window.location.href =
+      `../checkout.html?typeId=${encodeURIComponent(type.id)}` +
+      `&typeName=${encodeURIComponent(type.name)}`;
   }
 });

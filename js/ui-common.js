@@ -1,6 +1,6 @@
 // Shared UI helpers for the inventory pages: HTML escaping, toasts,
 // section accent colors, count caches, and the lazy count-fetch pool.
-import { getUnitCounts } from './firestore.js?v=3';
+import { getUnitCounts } from './firestore.js?v=5';
 
 export function esc(value) {
   return String(value ?? '')
@@ -101,6 +101,15 @@ function setCachedAvail(typeId, n) {
     all[typeId] = { n, at: Date.now() };
     sessionStorage.setItem(AVAIL_KEY, JSON.stringify(all));
   } catch { /* fine — just means a re-read later */ }
+}
+
+/** Drop one type's cached availability (e.g. right after a checkout). */
+export function invalidateCachedAvail(typeId) {
+  try {
+    const all = loadAvail();
+    delete all[typeId];
+    sessionStorage.setItem(AVAIL_KEY, JSON.stringify(all));
+  } catch { /* fine */ }
 }
 
 // ── Counts display ──

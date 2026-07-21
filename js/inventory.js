@@ -1,7 +1,7 @@
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js';
-import { auth } from './firebase-init.js?v=3';
-import { signOut } from './auth.js?v=3';
-import { subscribeEquipmentTypes } from './firestore.js?v=3';
+import { auth } from './firebase-init.js?v=5';
+import { signOut } from './auth.js?v=5';
+import { subscribeEquipmentTypes } from './firestore.js?v=5';
 import {
   esc,
   showToast,
@@ -9,7 +9,7 @@ import {
   saveTypesToSession,
   countsHtml,
   createCountPool,
-} from './ui-common.js?v=3';
+} from './ui-common.js?v=5';
 
 const contentEl = document.getElementById('content');
 const statusEl = document.getElementById('inventory-status');
