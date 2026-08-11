@@ -1,6 +1,6 @@
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js';
-import { auth } from './firebase-init.js?v=5';
-import { signIn } from './auth.js?v=5';
+import { auth } from './firebase-init.js?v=8';
+import { signIn } from './auth.js?v=8';
 
 // Already logged in — skip straight to the inventory
 onAuthStateChanged(auth, (user) => {

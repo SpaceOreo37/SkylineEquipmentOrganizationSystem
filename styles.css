@@ -17,7 +17,17 @@
   --green-fg: #16a34a;
   --amber-bg: #fef3c7;
   --amber-fg: #d97706;
+  --red-bg: #fee2e2;
+  --blue-bg: #e1effe;
+  --blue-fg: #1e429f;
   --radius: 8px;
+  /* Content column shared by <main> and the header contents, so the two stay
+     aligned on wide monitors instead of stretching edge to edge. Wide enough
+     that a full-width monitor still fits ~6 section cards per row. */
+  --content-width: 1440px;
+  /* Narrower column for single-focus flow pages. Sized so the 480px checkout
+     card nearly fills it — a wider column would leave the form stranded. */
+  --content-width-narrow: 540px;
 }
 
 body {
@@ -120,16 +130,25 @@ form button[type="submit"]:disabled {
   margin-top: 0.75rem;
 }
 
-/* ── Dashboard ── */
+/* ── App shell (header, tables, badges — shared by every signed-in page) ── */
 
+/* The bar itself is full-bleed so its bottom border spans the window, but its
+   contents line up with the centred content column in <main>. */
 header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 1rem;
-  padding: 0.875rem 1.5rem;
+  padding: 0.875rem max(1.5rem, calc((100% - var(--content-width)) / 2));
   background: var(--surface);
   border-bottom: 1px solid var(--border);
+}
+
+/* Equal flex on the two outer items is what centres .tabs in the window:
+   both sides claim the same width regardless of how wide their content is. */
+.logo,
+.header-right {
+  flex: 1;
+  min-width: 0;
 }
 
 .logo {
@@ -140,7 +159,44 @@ header {
 .header-right {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 0.75rem;
+}
+
+/* ── Main tab bar (Inventory / Dashboard) ── */
+
+.tabs {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 9999px;
+}
+
+.tabs a {
+  padding: 0.375rem 1.125rem;
+  border-radius: 9999px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+
+.tabs a:hover {
+  color: var(--text);
+  background: var(--surface);
+}
+
+.tabs a[aria-current="page"] {
+  background: var(--primary);
+  color: #fff;
+}
+
+.tabs a[aria-current="page"]:hover {
+  background: var(--primary-hover);
 }
 
 #user-email {
@@ -168,14 +224,24 @@ header {
 }
 
 main {
+  max-width: var(--content-width);
+  margin: 0 auto;
   padding: 1.5rem;
-  flex: 1;
 }
 
+/* Flow pages (checkout) — a focused form reads badly stretched across the
+   full inventory-width column. */
+main.main--narrow {
+  max-width: var(--content-width-narrow);
+}
+
+/* Page title. Deliberately a step above the section headings (1rem) so the
+   hierarchy still reads once the content column is this wide. */
 main h2 {
-  font-size: 1.125rem;
-  font-weight: 600;
-  margin-bottom: 1rem;
+  font-size: 1.375rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin-bottom: 1.25rem;
 }
 
 .table-wrapper {
@@ -243,6 +309,16 @@ td.error {
   color: var(--amber-fg);
 }
 
+.badge--in-use {
+  background: var(--blue-bg);
+  color: var(--blue-fg);
+}
+
+.badge--partial {
+  background: var(--amber-bg);
+  color: var(--amber-fg);
+}
+
 /* ── Inventory ── */
 
 .inventory-toolbar {
@@ -291,7 +367,7 @@ td.error {
 
 .section-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
   gap: 0.75rem;
 }
 
@@ -427,7 +503,11 @@ td.error {
   overflow-wrap: anywhere;
 }
 
+/* Fixed width so "N available / M total" starts at the same x on every row
+   instead of drifting with the length of the numbers. */
 .type-row__counts {
+  flex: 0 0 auto;
+  width: 11rem;
   font-size: 0.875rem;
   white-space: nowrap;
 }
@@ -643,6 +723,247 @@ form textarea:focus {
   background: var(--primary-hover);
 }
 
+.btn-secondary {
+  display: inline-block;
+  padding: 0.625rem 1.25rem;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 1rem;
+  font-weight: 500;
+  font-family: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.btn-secondary:hover {
+  background: var(--bg);
+  border-color: var(--text-muted);
+}
+
+.btn-secondary--sm {
+  padding: 0.375rem 0.875rem;
+  font-size: 0.875rem;
+}
+
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+/* ── Dashboard (active checkouts) ── */
+
+.dash-section {
+  margin-bottom: 2rem;
+}
+
+.dash-section:last-child {
+  margin-bottom: 0;
+}
+
+/* Heading and its summary sit together on the left. Pushing the summary to
+   the far edge left them a screen-width apart on a wide monitor. */
+.dash-section__head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.875rem;
+  margin-bottom: 0.75rem;
+}
+
+.dash-section__head h3 {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.dash-section__summary {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+.overdue-pill {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.15em 0.6em;
+  border-radius: 9999px;
+  background: var(--red-bg);
+  color: var(--error);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.empty-state {
+  padding: 1.5rem;
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  font-size: 0.9375rem;
+  text-align: center;
+}
+
+/* Due dates — the shared red flag for anything past due */
+
+.due--overdue {
+  color: var(--error);
+  font-weight: 600;
+}
+
+.due--soon {
+  color: var(--amber-fg);
+  font-weight: 600;
+}
+
+.due--none {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* Your active checkouts — one card per loan */
+
+/* auto-fit (not auto-fill) so a short row of cards stretches to meet the
+   full-width panels below instead of trailing off into dead space. */
+.co-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 0.75rem;
+}
+
+.co-card {
+  display: flex;
+  flex-direction: column;
+  /* Keeps a lone card from stretching the whole column width. */
+  max-width: 520px;
+  padding: 1rem 1.125rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.co-card--overdue {
+  border-left: 3px solid var(--error);
+}
+
+.co-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.co-card__name {
+  font-weight: 600;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.co-card__head .badge {
+  flex-shrink: 0;
+}
+
+.co-card__facts > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.35rem 0;
+  font-size: 0.875rem;
+}
+
+.co-card__facts > div + div {
+  border-top: 1px solid var(--border);
+}
+
+.co-card__facts dt {
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.co-card__facts dd {
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+/* auto top margin keeps the Return buttons on one line across a row of
+   cards, however differently the facts above them wrap. */
+.co-card__actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: auto;
+  padding-top: 0.875rem;
+}
+
+/* Department overview — grouped rows per teacher */
+
+.teacher-group {
+  margin-bottom: 1.25rem;
+}
+
+.teacher-group:last-child {
+  margin-bottom: 0;
+}
+
+.teacher-group__name {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.teacher-group__you {
+  padding: 0.1em 0.6em;
+  border-radius: 9999px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Fixed tracks so quantity, due date and status each start at the same x on
+   every row — the whole panel reads as a table rather than drifting text. */
+.co-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 4.5rem 13.5rem 8rem;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.625rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.co-row:last-child {
+  border-bottom: none;
+}
+
+.co-row__name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.co-row__qty {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  text-align: right;
+}
+
+.co-row__due {
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+
+.co-row .badge {
+  justify-self: start;
+}
+
 .toast {
   position: fixed;
   bottom: 1.5rem;
@@ -655,6 +976,62 @@ form textarea:focus {
   font-size: 0.9375rem;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
   z-index: 100;
+}
+
+/* The department rows' fixed tracks need ~700px before the equipment name is
+   squeezed. Below that, drop the table layout and let the row wrap. */
+@media (max-width: 720px) {
+  .co-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem 0.75rem;
+  }
+
+  .co-row__name {
+    flex-basis: 100%;
+  }
+
+  .co-row__qty {
+    text-align: left;
+  }
+
+  .co-row__due {
+    white-space: normal;
+  }
+}
+
+@media (max-width: 640px) {
+  main {
+    padding: 1rem;
+  }
+
+  /* Phone header: logo and sign-out share the top row, the tabs wrap onto a
+     full-width row below as an edge-to-edge segmented control. */
+  header {
+    flex-wrap: wrap;
+    row-gap: 0.75rem;
+    padding: 0.75rem 1rem;
+  }
+
+  .header-right {
+    flex: 0 0 auto;
+  }
+
+  .tabs {
+    order: 3;
+    flex-basis: 100%;
+  }
+
+  .tabs a {
+    flex: 1;
+    text-align: center;
+  }
+
+  /* The email is the first thing worth dropping once the tabs and the
+     sign-out button are competing for a phone-width header. */
+  #user-email {
+    display: none;
+  }
 }
 
 @media (max-width: 540px) {

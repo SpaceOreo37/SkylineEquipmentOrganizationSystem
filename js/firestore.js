@@ -13,13 +13,7 @@ import {
   Timestamp,
   where,
 } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js';
-import { db } from './firebase-init.js?v=5';
-
-export async function getEquipment() {
-  const q = query(collection(db, 'equipment'), orderBy('name'));
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-}
+import { db } from './firebase-init.js?v=8';
 
 /**
  * Live-subscribe to all equipmentTypes, sorted by name.
@@ -153,6 +147,32 @@ export async function getTeacherNameByRoom(roomNumber) {
 
 export const NOT_ENOUGH_UNITS_MSG =
   'Not enough units available, please try a lower quantity';
+
+/** Checkout statuses that still have units out in the world. */
+export const ACTIVE_CHECKOUT_STATUSES = ['in-use', 'partial'];
+
+/**
+ * Live-subscribe to every checkout that still has units outstanding. The
+ * status filter is the read-light part: fully-returned checkouts accumulate
+ * forever, and this never reads them. The dashboard splits the result into
+ * "mine" and "department" client-side, so one listener feeds both sections.
+ *
+ * Deliberately no orderBy — an `in` filter plus an orderBy on a different
+ * field would require a composite index. The result set is small (only
+ * outstanding loans), so the dashboard sorts it in memory instead.
+ * Returns the unsubscribe function.
+ */
+export function subscribeActiveCheckouts(onCheckouts, onError) {
+  const q = query(
+    collection(db, 'checkouts'),
+    where('status', 'in', ACTIVE_CHECKOUT_STATUSES)
+  );
+  return onSnapshot(
+    q,
+    (snap) => onCheckouts(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+    onError
+  );
+}
 
 /**
  * One-time fetch of a teacher's users document. Tries the doc keyed by the

@@ -12,15 +12,48 @@ A web app for Skyline's science department to track equipment loans (check-in / 
 ## Project structure
 
 ```
-index.html          — single page; toggles between login and dashboard views
+index.html            — sign-in page
+inventory.html        — section cards + all-equipment search
+sections/section.html — equipment types within one section
+checkout.html         — check-out form
+dashboard.html        — your active checkouts + department overview
 styles.css
 js/
-  firebase-init.js  — Firebase app init; exports `auth` and `db`
-  auth.js           — signIn / signOut wrappers
-  firestore.js      — Firestore read helpers
-  app.js            — entry point; wires UI to auth + firestore
-firestore.rules     — paste into Firebase console → Firestore → Rules
+  firebase-init.js    — Firebase app init; exports `auth` and `db`
+  auth.js             — signIn / signOut wrappers
+  firestore.js        — all Firestore reads/writes
+  ui-common.js        — shared helpers: escaping, toasts, caches, profile
+  app.js              — sign-in page
+  inventory.js        — inventory.html
+  section.js          — sections/section.html
+  checkout.js         — checkout.html
+  dashboard.js        — dashboard.html
+firestore.rules       — paste into Firebase console → Firestore → Rules
 ```
+
+Every page's HTML and JS is loaded with a `?v=N` query string. Bump `N`
+across all files together whenever page structure and script change in the
+same commit — it busts stale browser caches, and each page's version-skew
+guard shows a "hard-refresh required" banner if the two ever mismatch.
+
+Note the one gap: the `.html` files themselves are plain URLs with no `?v=`,
+so a browser holding a cached copy of a page will keep asking for the *old*
+`styles.css?v=N-1` and render a version behind. If one page looks stale after
+a deploy while the others updated, hard-refresh it (`Cmd`/`Ctrl`+`Shift`+`R`).
+
+Layout is driven by two custom properties. `--content-width` (1440px) is the
+column for the list pages, applied to `<main>` and mirrored in the header's
+padding so the bar stays full-bleed while its contents stay aligned to the
+same column. `--content-width-narrow` (540px) is opted into per page with
+`<main class="main--narrow">` — currently just the checkout form.
+
+`inventory.html` and `dashboard.html` are the two top-level tabs and carry
+the centred `<nav class="tabs">` bar in their header. `checkout.html` and
+`sections/section.html` are flow / drill-down pages: no tabs, just a
+`.back-btn` out. To add a third tab, copy the `<nav class="tabs">` block into
+each page and move `aria-current="page"` onto the link for the page you are
+editing — that attribute is what both the active styling and the screen
+reader state key off.
 
 ## Running locally
 
@@ -52,24 +85,70 @@ Then open `http://localhost:8000` in your browser.
 
 ## Data model
 
-### `equipment` collection
+Equipment is modelled in two collections: one document per *type* of thing
+(`equipmentTypes`), and one document per physical *unit* of it
+(`equipmentUnits`). Units are what get checked out.
 
-| Field      | Type   | Values                        |
-|------------|--------|-------------------------------|
-| `name`     | string | e.g. `"Bunsen Burner"`        |
-| `category` | string | e.g. `"Heat Sources"`         |
-| `status`   | string | `"available"` \| `"checked-out"` |
-| `location` | string | e.g. `"Cabinet A3"`           |
+### `equipmentTypes` collection
+
+| Field      | Type   | Notes                            |
+|------------|--------|----------------------------------|
+| `name`     | string | e.g. `"Bunsen Burner"`           |
+| `section`  | string | e.g. `"Chemistry"` — groups the inventory page |
+| `category` | string | optional sub-grouping            |
+
+### `equipmentUnits` collection
+
+One document per physical item.
+
+| Field        | Type   | Notes                                  |
+|--------------|--------|----------------------------------------|
+| `typeId`     | string | doc ID from `equipmentTypes`           |
+| `status`     | string | `"available"` \| `"checked-out"`       |
+| `homeRoom`   | string | room the unit normally lives in        |
+| `assignedTo` | string | teacher uid while checked out, else absent |
+| `checkoutId` | string | doc ID from `checkouts` while out      |
 
 ### `checkouts` collection
 
-| Field              | Type      | Notes                     |
-|--------------------|-----------|---------------------------|
-| `equipmentId`      | string    | doc ID from `equipment`   |
-| `teacherEmail`     | string    |                           |
-| `checkoutDate`     | timestamp |                           |
-| `expectedReturn`   | timestamp |                           |
-| `actualReturn`     | timestamp | `null` until returned     |
+| Field                | Type      | Notes                                     |
+|----------------------|-----------|-------------------------------------------|
+| `teacherUid`         | string    | Firebase Auth uid                         |
+| `teacherName`        | string    | denormalised for display                  |
+| `equipmentTypeId`    | string    | doc ID from `equipmentTypes`              |
+| `equipmentTypeName`  | string    | denormalised for display                  |
+| `unitIds`            | string[]  | units taken out                           |
+| `returnedUnitIds`    | string[]  | subset already brought back               |
+| `quantity`           | number    | `unitIds.length` at checkout time         |
+| `checkoutDate`       | timestamp | `serverTimestamp()`                       |
+| `expectedReturnDate` | timestamp | local midnight of the chosen day          |
+| `returnedDate`       | timestamp | `null` until fully returned               |
+| `status`             | string    | `"in-use"` \| `"partial"` \| `"returned"` |
+| `notes`              | string    |                                           |
+| `returnNotes`        | string    | `null` until returned                     |
+
+### `users` collection
+
+Keyed by Firebase Auth uid. Created manually per teacher.
+
+| Field         | Type   | Notes                       |
+|---------------|--------|-----------------------------|
+| `displayName` | string | shown as the teacher's name |
+| `roomNumber`  | string | drives home-room preference at checkout |
+
+## Read budget
+
+The project runs on Firestore's free Spark tier, so pages are written to
+spend as few document reads as possible:
+
+- Never `getDocs()` the whole `equipmentUnits` collection — use `count()`
+  aggregations (1 read each) for availability.
+- Query `checkouts` filtered by `status`; fully-returned checkouts pile up
+  forever and must never be loaded.
+- The dashboard runs **one** `onSnapshot` on active checkouts and splits it
+  into "yours" and "department" in memory rather than issuing two queries.
+- The equipment type list and the teacher's profile are handed between pages
+  through `sessionStorage`, not re-fetched.
 
 ## Deploying to Vercel
 
