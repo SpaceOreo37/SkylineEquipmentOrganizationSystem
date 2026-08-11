@@ -1,13 +1,13 @@
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js';
-import { auth } from './firebase-init.js?v=5';
-import { signOut } from './auth.js?v=5';
-import { getEquipmentTypesBySection } from './firestore.js?v=5';
+import { auth } from './firebase-init.js?v=8';
+import { signOut } from './auth.js?v=8';
+import { getEquipmentTypesBySection } from './firestore.js?v=8';
 import {
   esc,
   loadTypesFromSession,
   countsHtml,
   createCountPool,
-} from './ui-common.js?v=5';
+} from './ui-common.js?v=8';
 
 const titleEl = document.getElementById('section-title');
 const statusEl = document.getElementById('section-status');

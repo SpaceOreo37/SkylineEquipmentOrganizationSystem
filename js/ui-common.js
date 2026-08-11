@@ -1,6 +1,6 @@
 // Shared UI helpers for the inventory pages: HTML escaping, toasts,
 // section accent colors, count caches, and the lazy count-fetch pool.
-import { getUnitCounts } from './firestore.js?v=5';
+import { getUnitCounts, getUserProfile } from './firestore.js?v=8';
 
 export function esc(value) {
   return String(value ?? '')
@@ -29,6 +29,41 @@ export function sectionAccent(name) {
     hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
   }
   return `accent-${hash % ACCENT_COUNT}`;
+}
+
+// ── Teacher profile (users doc) — one fetch per session, then sessionStorage ──
+const PROFILE_KEY = 'eos:profile:v1';
+
+/**
+ * The cached profile for this uid, or null if it isn't there yet. Costs zero
+ * reads, so pages that only need the teacher's name/room can degrade
+ * gracefully instead of spending a read.
+ */
+export function readProfileFromSession(uid) {
+  try {
+    const cached = JSON.parse(sessionStorage.getItem(PROFILE_KEY));
+    if (cached && cached.uid === uid) return cached;
+  } catch { /* corrupt — treat as absent */ }
+  return null;
+}
+
+/**
+ * The teacher's profile: cached if present, otherwise one users-doc read
+ * that is then cached for the rest of the session.
+ * Returns { uid, teacherName, roomNumber }.
+ */
+export async function loadProfile(user) {
+  const cached = readProfileFromSession(user.uid);
+  if (cached) return cached;
+
+  const p = await getUserProfile(user.uid);
+  const profile = {
+    uid: user.uid,
+    teacherName: p.displayName || user.email,
+    roomNumber: p.roomNumber ?? null,
+  };
+  try { sessionStorage.setItem(PROFILE_KEY, JSON.stringify(profile)); } catch { /* fine */ }
+  return profile;
 }
 
 // ── equipmentTypes handoff between pages (sessionStorage) ──

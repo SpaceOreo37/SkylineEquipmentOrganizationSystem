@@ -1,19 +1,19 @@
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js';
-import { auth } from './firebase-init.js?v=5';
-import { signOut } from './auth.js?v=5';
+import { auth } from './firebase-init.js?v=8';
+import { signOut } from './auth.js?v=8';
 import {
   checkoutEquipment,
   getOtherRoomsBreakdown,
   getRoomSplitCounts,
   getTeacherNameByRoom,
-  getUserProfile,
   NOT_ENOUGH_UNITS_MSG,
-} from './firestore.js?v=5';
+} from './firestore.js?v=8';
 import {
   esc,
+  loadProfile,
   loadTypesFromSession,
   invalidateCachedAvail,
-} from './ui-common.js?v=5';
+} from './ui-common.js?v=8';
 
 const statusEl = document.getElementById('checkout-status');
 const formEl = document.getElementById('checkout-form');
@@ -70,25 +70,6 @@ document.getElementById('sign-out-btn').addEventListener('click', async () => {
   await signOut();
   window.location.href = 'index.html';
 });
-
-// ── Teacher profile (users doc) — one fetch per session, then sessionStorage ──
-const PROFILE_KEY = 'eos:profile:v1';
-
-async function loadProfile(user) {
-  try {
-    const cached = JSON.parse(sessionStorage.getItem(PROFILE_KEY));
-    if (cached && cached.uid === user.uid) return cached;
-  } catch { /* corrupt — refetch */ }
-
-  const p = await getUserProfile(user.uid);
-  const profile = {
-    uid: user.uid,
-    teacherName: p.displayName || user.email,
-    roomNumber: p.roomNumber ?? null,
-  };
-  try { sessionStorage.setItem(PROFILE_KEY, JSON.stringify(profile)); } catch { /* fine */ }
-  return profile;
-}
 
 // ── Init ──
 async function init(user) {
@@ -460,7 +441,10 @@ function showSuccess(type, quantity, returnDate, units) {
       <dt>From</dt><dd>${roomsText}</dd>
       <dt>Due back</dt><dd>${esc(dueText)}</dd>
     </dl>
-    <a class="btn-primary" href="inventory.html">Back to Inventory</a>`;
+    <div class="button-row">
+      <a class="btn-primary" href="inventory.html">Back to Inventory</a>
+      <a class="btn-secondary" href="dashboard.html">View Dashboard</a>
+    </div>`;
 }
 
 // ── Date helpers ──

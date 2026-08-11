@@ -4,12 +4,18 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Skyline EOS — Dashboard</title>
-  <link rel="stylesheet" href="styles.css?v=5">
+  <link rel="stylesheet" href="styles.css?v=8">
 </head>
 <body>
 
   <header>
     <span class="logo">Skyline EOS</span>
+    <!-- aria-current marks the active tab: styling and screen-reader state
+         both hang off it, so set it on exactly one link per page. -->
+    <nav class="tabs" aria-label="Main">
+      <a href="inventory.html">Inventory</a>
+      <a href="dashboard.html" aria-current="page">Dashboard</a>
+    </nav>
     <div class="header-right">
       <span id="user-email"></span>
       <button id="sign-out-btn">Sign out</button>
@@ -17,24 +23,30 @@
   </header>
 
   <main>
-    <h2>Equipment</h2>
-    <div class="table-wrapper">
-      <table>
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Category</th>
-            <th>Status</th>
-            <th>Location</th>
-          </tr>
-        </thead>
-        <tbody id="equipment-tbody">
-          <tr><td colspan="4" class="loading">Loading…</td></tr>
-        </tbody>
-      </table>
-    </div>
+    <h2>Dashboard</h2>
+
+    <p id="dashboard-status" class="status">Loading checkouts…</p>
+
+    <section class="dash-section">
+      <div class="dash-section__head">
+        <h3>Your Active Checkouts</h3>
+        <span id="my-summary" class="dash-section__summary"></span>
+      </div>
+      <div id="my-checkouts" aria-live="polite"></div>
+    </section>
+
+    <section class="dash-section">
+      <div class="dash-section__head">
+        <h3>Department Overview</h3>
+        <span id="dept-summary" class="dash-section__summary"></span>
+      </div>
+      <div id="dept-checkouts" aria-live="polite"></div>
+    </section>
   </main>
 
-  <script type="module" src="js/dashboard.js?v=5"></script>
+  <div id="toast" class="toast" hidden></div>
+
+  <!-- Bump ?v= when page structure and script change together (cache busting) -->
+  <script type="module" src="js/dashboard.js?v=8"></script>
 </body>
 </html>
