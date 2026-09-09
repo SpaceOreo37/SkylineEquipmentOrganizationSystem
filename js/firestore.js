@@ -13,7 +13,7 @@ import {
   Timestamp,
   where,
 } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js';
-import { db } from './firebase-init.js?v=8';
+import { db } from './firebase-init.js?v=10';
 
 /**
  * Live-subscribe to all equipmentTypes, sorted by name.
@@ -147,6 +147,9 @@ export async function getTeacherNameByRoom(roomNumber) {
 
 export const NOT_ENOUGH_UNITS_MSG =
   'Not enough units available, please try a lower quantity';
+
+export const CHECKOUT_NOT_FOUND_MSG = 'This checkout no longer exists.';
+export const CHECKOUT_ALREADY_RETURNED_MSG = 'This checkout has already been fully returned.';
 
 /** Checkout statuses that still have units out in the world. */
 export const ACTIVE_CHECKOUT_STATUSES = ['in-use', 'partial'];
@@ -296,5 +299,65 @@ export async function checkoutEquipment({
       checkoutId: checkoutRef.id,
       units: chosen.map((s) => ({ id: s.id, homeRoom: s.data().homeRoom })),
     };
+  });
+}
+
+/**
+ * Return `quantity` units from one checkout, in a single transaction.
+ *
+ * Unlike checkoutEquipment, no pre-transaction candidate query is needed —
+ * the units to return are already determined by the checkout doc itself
+ * (unitIds minus returnedUnitIds), so every read in this transaction is a
+ * read-by-ID, never a query, same as the read-light rule for checkout.
+ *
+ * Marks the checkout "returned" once every unit is back, otherwise
+ * "partial". Throws if the checkout was deleted, already fully returned, or
+ * `quantity` exceeds what's still outstanding — e.g. two tabs racing to
+ * return the same checkout: Firestore retries the loser's transaction, which
+ * then sees the winner's write and re-evaluates against the fresh data.
+ *
+ * Returns { fullyReturned, returned }.
+ */
+export async function returnEquipment({ checkoutId, quantity, returnNotes }) {
+  const checkoutRef = doc(db, 'checkouts', checkoutId);
+
+  return runTransaction(db, async (tx) => {
+    // All reads must precede writes in a Firestore transaction.
+    const checkoutSnap = await tx.get(checkoutRef);
+    if (!checkoutSnap.exists()) {
+      throw new Error(CHECKOUT_NOT_FOUND_MSG);
+    }
+    const checkout = checkoutSnap.data();
+    if (checkout.status === 'returned') {
+      throw new Error(CHECKOUT_ALREADY_RETURNED_MSG);
+    }
+
+    const alreadyReturned = checkout.returnedUnitIds || [];
+    const allUnitIds = checkout.unitIds || [];
+    const outstandingIds = allUnitIds.filter((id) => !alreadyReturned.includes(id));
+    if (quantity > outstandingIds.length) {
+      throw new Error(`Only ${outstandingIds.length} unit(s) still outstanding.`);
+    }
+
+    const idsToReturn = outstandingIds.slice(0, quantity);
+    for (const unitId of idsToReturn) {
+      tx.update(doc(db, 'equipmentUnits', unitId), {
+        status: 'available',
+        assignedTo: null,
+        checkoutId: null,
+      });
+    }
+
+    const returnedUnitIds = [...alreadyReturned, ...idsToReturn];
+    const fullyReturned = returnedUnitIds.length === allUnitIds.length;
+    const update = {
+      returnedUnitIds,
+      status: fullyReturned ? 'returned' : 'partial',
+    };
+    if (fullyReturned) update.returnedDate = serverTimestamp();
+    if (returnNotes) update.returnNotes = returnNotes;
+    tx.update(checkoutRef, update);
+
+    return { fullyReturned, returned: idsToReturn.length };
   });
 }

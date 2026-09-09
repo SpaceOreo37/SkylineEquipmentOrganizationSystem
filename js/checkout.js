@@ -1,19 +1,19 @@
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js';
-import { auth } from './firebase-init.js?v=8';
-import { signOut } from './auth.js?v=8';
+import { auth } from './firebase-init.js?v=10';
+import { signOut } from './auth.js?v=10';
 import {
   checkoutEquipment,
   getOtherRoomsBreakdown,
   getRoomSplitCounts,
   getTeacherNameByRoom,
   NOT_ENOUGH_UNITS_MSG,
-} from './firestore.js?v=8';
+} from './firestore.js?v=10';
 import {
   esc,
   loadProfile,
   loadTypesFromSession,
   invalidateCachedAvail,
-} from './ui-common.js?v=8';
+} from './ui-common.js?v=10';
 
 const statusEl = document.getElementById('checkout-status');
 const formEl = document.getElementById('checkout-form');
