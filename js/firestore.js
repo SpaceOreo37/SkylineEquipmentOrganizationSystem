@@ -13,7 +13,7 @@ import {
   Timestamp,
   where,
 } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js';
-import { db } from './firebase-init.js?v=9';
+import { db } from './firebase-init.js?v=10';
 
 /**
  * Live-subscribe to all equipmentTypes, sorted by name.

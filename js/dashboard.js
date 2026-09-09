@@ -1,8 +1,8 @@
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js';
-import { auth } from './firebase-init.js?v=9';
-import { signOut } from './auth.js?v=9';
-import { subscribeActiveCheckouts, returnEquipment } from './firestore.js?v=9';
-import { esc, showToast, readProfileFromSession } from './ui-common.js?v=9';
+import { auth } from './firebase-init.js?v=10';
+import { signOut } from './auth.js?v=10';
+import { subscribeActiveCheckouts, returnEquipment } from './firestore.js?v=10';
+import { esc, showToast, readProfileFromSession, invalidateCachedAvail } from './ui-common.js?v=10';
 
 const statusEl = document.getElementById('dashboard-status');
 const myEl = document.getElementById('my-checkouts');
@@ -325,6 +325,10 @@ myEl.addEventListener('submit', async (e) => {
     // transaction's write fires onSnapshot, which re-renders with the
     // updated (or, if fully returned, removed) checkout.
     returnUi.delete(id);
+    // Units just went back to "available" — bust the inventory/section
+    // pages' 5-minute availability cache so they don't keep showing the
+    // pre-return count (same reason checkout.js invalidates it on checkout).
+    invalidateCachedAvail(c.equipmentTypeId);
     showToast(
       result.fullyReturned
         ? `Returned all ${quantity} unit(s) — checkout closed.`
