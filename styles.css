@@ -897,6 +897,60 @@ form textarea:focus {
   padding-top: 0.875rem;
 }
 
+/* Return form — replaces .co-card__actions inline within the card, no modal
+   pattern exists elsewhere in this app so this follows the card's own flow. */
+.return-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: auto;
+  padding-top: 0.875rem;
+  border-top: 1px solid var(--border);
+}
+
+.return-form label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.return-form input,
+.return-form textarea {
+  display: block;
+  width: 100%;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 0.9375rem;
+  font-family: inherit;
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.return-form textarea {
+  resize: vertical;
+}
+
+.return-form input:focus,
+.return-form textarea:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(26, 86, 219, 0.12);
+}
+
+.return-form input:disabled,
+.return-form textarea:disabled {
+  background: var(--bg);
+  color: var(--text-muted);
+}
+
+.return-form__actions {
+  justify-content: flex-end;
+}
+
+.return-form .error {
+  margin: 0;
+}
+
 /* Department overview — grouped rows per teacher */
 
 .teacher-group {

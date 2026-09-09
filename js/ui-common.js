@@ -1,6 +1,6 @@
 // Shared UI helpers for the inventory pages: HTML escaping, toasts,
 // section accent colors, count caches, and the lazy count-fetch pool.
-import { getUnitCounts, getUserProfile } from './firestore.js?v=8';
+import { getUnitCounts, getUserProfile } from './firestore.js?v=9';
 
 export function esc(value) {
   return String(value ?? '')

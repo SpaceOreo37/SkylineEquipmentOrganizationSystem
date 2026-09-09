@@ -1,8 +1,8 @@
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js';
-import { auth } from './firebase-init.js?v=8';
-import { signOut } from './auth.js?v=8';
-import { subscribeActiveCheckouts } from './firestore.js?v=8';
-import { esc, showToast, readProfileFromSession } from './ui-common.js?v=8';
+import { auth } from './firebase-init.js?v=9';
+import { signOut } from './auth.js?v=9';
+import { subscribeActiveCheckouts, returnEquipment } from './firestore.js?v=9';
+import { esc, showToast, readProfileFromSession } from './ui-common.js?v=9';
 
 const statusEl = document.getElementById('dashboard-status');
 const myEl = document.getElementById('my-checkouts');
@@ -30,6 +30,20 @@ const state = {
   checkouts: [],
   loaded: false,
 };
+
+// ── Return form UI state (per checkout, survives re-renders) ──
+// Keyed by checkout id rather than baked into `state.checkouts` because the
+// live checkout data is replaced wholesale on every onSnapshot fire (e.g. a
+// department-mate's unrelated checkout changing), while an in-progress
+// return form's open/typed state must not be wiped out by that.
+const returnUi = new Map();
+
+function getReturnUi(id) {
+  if (!returnUi.has(id)) {
+    returnUi.set(id, { open: false, quantity: 1, notes: '', submitting: false, error: null });
+  }
+  return returnUi.get(id);
+}
 
 // ── Auth guard ──
 let unsubscribe = null;
@@ -138,6 +152,8 @@ function myCardHtml(c, now) {
   const due = dueInfo(toDate(c.expectedReturnDate), now);
   const total = Number(c.quantity) || 0;
   const checkedOutOn = toDate(c.checkoutDate);
+  const out = outstanding(c);
+  const ui = getReturnUi(c.id);
 
   return `
     <article class="co-card${due.overdue ? ' co-card--overdue' : ''}" data-checkout-id="${esc(c.id)}">
@@ -148,7 +164,7 @@ function myCardHtml(c, now) {
       <dl class="co-card__facts">
         <div>
           <dt>Still out</dt>
-          <dd><strong>${outstanding(c)}</strong> of ${total}</dd>
+          <dd><strong>${out}</strong> of ${total}</dd>
         </div>
         <div>
           <dt>Checked out</dt>
@@ -159,10 +175,37 @@ function myCardHtml(c, now) {
           <dd class="${due.cls}">${esc(due.label)}</dd>
         </div>
       </dl>
+      ${ui.open ? returnFormHtml(c, out, ui) : `
       <div class="co-card__actions">
         <button type="button" class="btn-secondary btn-secondary--sm" data-return>Return</button>
-      </div>
+      </div>`}
     </article>`;
+}
+
+function returnFormHtml(c, out, ui) {
+  const qty = Math.min(Math.max(Math.floor(Number(ui.quantity)) || 1, 1), out);
+  return `
+    <form class="return-form" data-return-form novalidate>
+      <label for="return-qty-${esc(c.id)}">Quantity to return</label>
+      <input type="number" id="return-qty-${esc(c.id)}" data-return-qty
+             min="1" max="${out}" step="1" inputmode="numeric"
+             value="${qty}" ${ui.submitting ? 'disabled' : ''}>
+
+      <label for="return-notes-${esc(c.id)}">Return notes <span class="optional">(optional)</span></label>
+      <textarea id="return-notes-${esc(c.id)}" data-return-notes rows="2"
+                ${ui.submitting ? 'disabled' : ''}>${esc(ui.notes)}</textarea>
+
+      ${ui.error ? `<p class="error">${esc(ui.error)}</p>` : ''}
+
+      <div class="button-row return-form__actions">
+        <button type="submit" class="btn-primary btn-secondary--sm" ${ui.submitting ? 'disabled' : ''}>
+          ${ui.submitting ? 'Returning…' : 'Confirm Return'}
+        </button>
+        <button type="button" class="btn-secondary btn-secondary--sm" data-return-cancel ${ui.submitting ? 'disabled' : ''}>
+          Cancel
+        </button>
+      </div>
+    </form>`;
 }
 
 function deptRowHtml(c, now) {
@@ -196,10 +239,102 @@ function emptyHtml(message) {
   return `<p class="empty-state">${esc(message)}</p>`;
 }
 
-// Returns land as a "coming soon" toast until the return flow is built.
+// ── Return flow ──
+// The form lives inline in the card rather than a modal (no modal pattern
+// exists elsewhere in this app). Opening/cancelling/submitting all go through
+// getReturnUi() + render() so the UI stays a pure function of state + returnUi;
+// typing (the 'input' listener below) mutates returnUi directly without a
+// render(), so the browser's own text input keeps focus and cursor position.
 myEl.addEventListener('click', (e) => {
-  if (e.target.closest('[data-return]')) {
-    showToast('Returns are coming soon.');
+  const openBtn = e.target.closest('[data-return]');
+  if (openBtn) {
+    const id = openBtn.closest('[data-checkout-id]')?.dataset.checkoutId;
+    const c = id && state.checkouts.find((x) => x.id === id);
+    if (!c) return;
+    const ui = getReturnUi(id);
+    ui.open = true;
+    ui.error = null;
+    ui.quantity = outstanding(c); // default: return everything still out
+    ui.notes = '';
+    render();
+    return;
+  }
+
+  const cancelBtn = e.target.closest('[data-return-cancel]');
+  if (cancelBtn) {
+    const id = cancelBtn.closest('[data-checkout-id]')?.dataset.checkoutId;
+    if (id) returnUi.delete(id);
+    render();
+  }
+});
+
+myEl.addEventListener('input', (e) => {
+  const qtyInput = e.target.closest('[data-return-qty]');
+  if (qtyInput) {
+    const id = qtyInput.closest('[data-checkout-id]')?.dataset.checkoutId;
+    if (!id) return;
+    const c = state.checkouts.find((x) => x.id === id);
+    const out = c ? outstanding(c) : Infinity;
+    if (Number(qtyInput.value) > out) qtyInput.value = out;
+    getReturnUi(id).quantity = qtyInput.value;
+    return;
+  }
+
+  const notesInput = e.target.closest('[data-return-notes]');
+  if (notesInput) {
+    const id = notesInput.closest('[data-checkout-id]')?.dataset.checkoutId;
+    if (id) getReturnUi(id).notes = notesInput.value;
+  }
+});
+
+myEl.addEventListener('submit', async (e) => {
+  const form = e.target.closest('[data-return-form]');
+  if (!form) return;
+  e.preventDefault();
+
+  const id = form.closest('[data-checkout-id]')?.dataset.checkoutId;
+  const c = id && state.checkouts.find((x) => x.id === id);
+  if (!c) return;
+  const ui = getReturnUi(id);
+  if (ui.submitting) return;
+
+  const out = outstanding(c);
+  const quantity = Math.floor(Number(ui.quantity));
+  if (!Number.isFinite(quantity) || quantity < 1) {
+    ui.error = 'Quantity must be at least 1.';
+    render();
+    return;
+  }
+  if (quantity > out) {
+    ui.error = `Only ${out} unit(s) outstanding.`;
+    render();
+    return;
+  }
+
+  ui.submitting = true;
+  ui.error = null;
+  render();
+
+  try {
+    const result = await returnEquipment({
+      checkoutId: id,
+      quantity,
+      returnNotes: ui.notes.trim(),
+    });
+    // Close the form and let the live listener refresh the card: the
+    // transaction's write fires onSnapshot, which re-renders with the
+    // updated (or, if fully returned, removed) checkout.
+    returnUi.delete(id);
+    showToast(
+      result.fullyReturned
+        ? `Returned all ${quantity} unit(s) — checkout closed.`
+        : `Returned ${quantity} unit(s) — ${out - quantity} still outstanding.`
+    );
+  } catch (err) {
+    console.error('Return failed:', err);
+    ui.submitting = false;
+    ui.error = err.message || 'Return failed. Please try again.';
+    render();
   }
 });
 
