@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Skyline EOS — Inventory</title>
-  <link rel="stylesheet" href="styles.css?v=10">
+  <link rel="stylesheet" href="styles.css?v=11">
 </head>
 <body>
 
@@ -27,6 +27,7 @@
       <h2>Inventory</h2>
       <input type="search" id="search-input" placeholder="Search all equipment…"
              aria-label="Search all equipment" autocomplete="off">
+      <button type="button" id="add-type-btn" class="btn-secondary btn-secondary--sm" hidden>+ Add equipment type</button>
     </div>
 
     <p id="inventory-status" class="status">Loading inventory…</p>
@@ -36,6 +37,6 @@
   <div id="toast" class="toast" hidden></div>
 
   <!-- Bump ?v= when page structure and script change together (cache busting) -->
-  <script type="module" src="js/inventory.js?v=10"></script>
+  <script type="module" src="js/inventory.js?v=11"></script>
 </body>
 </html>
