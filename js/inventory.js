@@ -1,7 +1,7 @@
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js';
-import { auth } from './firebase-init.js?v=10';
-import { signOut } from './auth.js?v=10';
-import { subscribeEquipmentTypes } from './firestore.js?v=10';
+import { auth } from './firebase-init.js?v=11';
+import { signOut } from './auth.js?v=11';
+import { subscribeEquipmentTypes } from './firestore.js?v=11';
 import {
   esc,
   showToast,
@@ -9,15 +9,17 @@ import {
   saveTypesToSession,
   countsHtml,
   createCountPool,
-} from './ui-common.js?v=10';
+} from './ui-common.js?v=11';
+import { openAddTypeDialog } from './manage.js?v=11';
 
 const contentEl = document.getElementById('content');
 const statusEl = document.getElementById('inventory-status');
 const searchInput = document.getElementById('search-input');
+const addTypeBtn = document.getElementById('add-type-btn');
 
 // Version-skew guard: if the browser cached a stale copy of this page's HTML
 // (or JS), required elements are missing. Fail loudly instead of blank.
-if (!contentEl || !statusEl || !searchInput) {
+if (!contentEl || !statusEl || !searchInput || !addTypeBtn) {
   document.body.insertAdjacentHTML(
     'beforeend',
     '<p style="margin:2rem;padding:1rem;border:1px solid #dc2626;border-radius:8px;color:#dc2626;background:#fff">' +
@@ -67,6 +69,7 @@ function onTypesUpdate(types) {
   state.loaded = true;
   saveTypesToSession(types); // hand-off so section pages never re-fetch
   statusEl.hidden = true;
+  addTypeBtn.hidden = false;
   render();
 }
 
@@ -91,7 +94,7 @@ function render() {
   if (!state.loaded) return;
 
   if (state.types.length === 0) {
-    contentEl.innerHTML = '<p class="status">No equipment types exist yet.</p>';
+    contentEl.innerHTML = '<p class="status">No equipment types exist yet. Use <b>+ Add equipment type</b> to create one.</p>';
     return;
   }
 
@@ -100,7 +103,7 @@ function render() {
 
   if (q) {
     for (const row of contentEl.querySelectorAll('[data-type-id]')) {
-      pool.request(row.dataset.typeId);
+      pool.request(row.dataset.typeId, Number(row.dataset.unitsVersion) || 0);
     }
   }
 }
@@ -144,6 +147,7 @@ function searchResultsHtml(q) {
     <div class="rows-panel">
       ${shown.map((t) => `
         <a class="type-row type-row--link" data-type-id="${esc(t.id)}"
+           data-units-version="${t.unitsVersion || 0}"
            href="sections/section.html?section=${encodeURIComponent(t.section || 'Uncategorized')}">
           <span class="type-row__name">
             ${esc(t.name)}
@@ -163,6 +167,18 @@ function patchRowCounts(typeId, counts) {
   if (!row) return;
   row.querySelector('.type-row__counts').innerHTML = countsHtml(counts);
 }
+
+// ── New equipment type ──
+// The live equipmentTypes listener picks up the new doc by itself, so the
+// section card / search results update without any extra work here.
+addTypeBtn.addEventListener('click', () => {
+  openAddTypeDialog({
+    sections: state.types.map((t) => t.section || 'Uncategorized'),
+    existingTypes: state.types,
+    onCreated: (type, total) =>
+      showToast(`Created “${type.name}” in ${type.section} with ${total} unit${total === 1 ? '' : 's'}`),
+  });
+});
 
 // Retry failed count loads (event delegation; the row itself is a link,
 // so stop the click from navigating).

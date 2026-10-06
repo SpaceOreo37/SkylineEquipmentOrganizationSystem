@@ -4,6 +4,8 @@ import {
   getCountFromServer,
   getDoc,
   getDocs,
+  getDocsFromServer,
+  increment,
   limit,
   onSnapshot,
   orderBy,
@@ -13,7 +15,7 @@ import {
   Timestamp,
   where,
 } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js';
-import { db } from './firebase-init.js?v=10';
+import { db } from './firebase-init.js?v=11';
 
 /**
  * Live-subscribe to all equipmentTypes, sorted by name.
@@ -360,4 +362,283 @@ export async function returnEquipment({ checkoutId, quantity, returnNotes }) {
 
     return { fullyReturned, returned: idsToReturn.length };
   });
+}
+
+// ── Inventory management: add / remove units, create / delete types ──
+//
+// Every change is atomic (one batch or transaction) and writes one
+// inventoryLog doc alongside it, so the log can never disagree with what
+// actually happened. Every change to a type's units also bumps the type's
+// `unitsVersion`; the live equipmentTypes listener carries that to other
+// teachers' browsers, which is how their cached unit totals know to refresh.
+//
+// Checked-out units are never removed: only units whose status is
+// "available" are candidates, and each is re-read inside the transaction
+// (same double-booking guard as checkoutEquipment).
+//
+// Every query here uses getDocsFromServer, never getDocs: with the
+// persistent cache, getDocs quietly answers from the local cache when the
+// connection drops, and a partial cached list of units could show a teacher
+// wrong counts or let a delete miss units. getDocsFromServer fails instead.
+// Writes all go through runTransaction for the same reason: a transaction
+// fails when offline, whereas a batch is queued locally and its promise
+// never settles, which would leave the dialog stuck on "Saving…".
+
+/** Room numbers are 4 digits starting with 1 or 2, matching the import. */
+export const ROOM_RE = /^[12]\d{3}$/;
+
+/**
+ * Cap on units written or deleted in one change. A Firestore batch or
+ * transaction holds at most 500 writes; this leaves room for the type doc
+ * and the log entry.
+ */
+export const MAX_UNITS_PER_CHANGE = 400;
+
+export const TYPE_GONE_MSG = 'This equipment type no longer exists — someone may have just deleted it.';
+export const UNITS_CHANGED_MSG =
+  'Some of those units were just checked out or removed by someone else. Please review the updated counts and try again.';
+
+/** A log entry for one inventory change. `rooms` is [{ room, quantity }]. */
+function logEntry({ action, type, rooms, actor }) {
+  return {
+    action,
+    typeId: type.id,
+    typeName: type.name,
+    section: type.section ?? null,
+    rooms,
+    quantity: rooms.reduce((n, r) => n + r.quantity, 0),
+    teacherUid: actor.uid,
+    teacherName: actor.teacherName,
+    at: serverTimestamp(),
+  };
+}
+
+function newUnit(typeId, typeName, homeRoom) {
+  return {
+    typeId,
+    typeName,
+    homeRoom,
+    status: 'available',
+    assignedTo: null,
+    checkoutId: null,
+  };
+}
+
+/** Validates [{ room, quantity }] and returns the total quantity. */
+function checkRooms(rooms, { allowEmpty = false } = {}) {
+  if (!Array.isArray(rooms) || (!allowEmpty && rooms.length === 0)) {
+    throw new Error('Enter at least one room and quantity.');
+  }
+  const seen = new Set();
+  let total = 0;
+  for (const { room, quantity } of rooms) {
+    if (!ROOM_RE.test(room)) throw new Error(`"${room}" isn't a valid room number.`);
+    if (seen.has(room)) throw new Error(`Room ${room} is listed twice.`);
+    seen.add(room);
+    if (!Number.isInteger(quantity) || quantity < 1) {
+      throw new Error(`Quantity for room ${room} must be a whole number of at least 1.`);
+    }
+    total += quantity;
+  }
+  if (total > MAX_UNITS_PER_CHANGE) {
+    throw new Error(`At most ${MAX_UNITS_PER_CHANGE} units can be changed at once.`);
+  }
+  return total;
+}
+
+/**
+ * Every unit of one type, grouped by room: [{ room, available, checkedOut }]
+ * sorted by room. Bills 1 read per unit — only called when a teacher opens
+ * the manage panel for a single type.
+ */
+export async function getTypeRoomBreakdown(typeId) {
+  const snap = await getDocsFromServer(query(
+    collection(db, 'equipmentUnits'),
+    where('typeId', '==', typeId)
+  ));
+  const byRoom = new Map();
+  for (const d of snap.docs) {
+    const { homeRoom, status } = d.data();
+    const room = homeRoom ?? '';
+    if (!byRoom.has(room)) byRoom.set(room, { room, available: 0, checkedOut: 0 });
+    if (status === 'available') byRoom.get(room).available++;
+    else byRoom.get(room).checkedOut++;
+  }
+  return [...byRoom.values()].sort((a, b) => String(a.room).localeCompare(String(b.room)));
+}
+
+/**
+ * Create a new equipment type plus its first units, in one transaction.
+ * Rejects a name that already exists (exact match; callers also check
+ * case-insensitively against the types they already have in memory).
+ *
+ * Returns the new type: { id, name, section, category, unitsVersion }.
+ */
+export async function createEquipmentType({ name, section, category, rooms, actor }) {
+  checkRooms(rooms);
+
+  const existing = await getDocsFromServer(query(
+    collection(db, 'equipmentTypes'),
+    where('name', '==', name),
+    limit(1)
+  ));
+  if (!existing.empty) {
+    throw new Error(`An equipment type named "${name}" already exists.`);
+  }
+
+  return runTransaction(db, async (tx) => {
+    const typeRef = doc(collection(db, 'equipmentTypes'));
+    const type = { id: typeRef.id, name, section, category, unitsVersion: 1 };
+    tx.set(typeRef, {
+      name,
+      section,
+      category,
+      unitsVersion: 1,
+      createdAt: serverTimestamp(),
+    });
+    for (const { room, quantity } of rooms) {
+      for (let i = 0; i < quantity; i++) {
+        tx.set(doc(collection(db, 'equipmentUnits')), newUnit(typeRef.id, name, room));
+      }
+    }
+    tx.set(doc(collection(db, 'inventoryLog')), logEntry({ action: 'create-type', type, rooms, actor }));
+    return type;
+  });
+}
+
+/**
+ * Add units of an existing type to one or more rooms.
+ * Returns { unitsVersion } — the type's new version.
+ */
+export async function addUnits({ type, rooms, actor }) {
+  checkRooms(rooms);
+  const typeRef = doc(db, 'equipmentTypes', type.id);
+
+  return runTransaction(db, async (tx) => {
+    const typeSnap = await tx.get(typeRef);
+    if (!typeSnap.exists()) throw new Error(TYPE_GONE_MSG);
+    const unitsVersion = (typeSnap.data().unitsVersion || 0) + 1;
+
+    for (const { room, quantity } of rooms) {
+      for (let i = 0; i < quantity; i++) {
+        tx.set(doc(collection(db, 'equipmentUnits')), newUnit(type.id, type.name, room));
+      }
+    }
+    tx.update(typeRef, { unitsVersion: increment(1) });
+    tx.set(doc(collection(db, 'inventoryLog')), logEntry({ action: 'add-units', type, rooms, actor }));
+    return { unitsVersion };
+  });
+}
+
+/**
+ * Remove available (on-the-shelf) units of one type from specific rooms.
+ * Candidates are found per room with a query, then re-read inside the
+ * transaction: if any was checked out or removed in the meantime the whole
+ * change aborts with UNITS_CHANGED_MSG and nothing is deleted.
+ *
+ * Returns { unitsVersion }.
+ */
+export async function removeUnits({ type, rooms, actor }) {
+  checkRooms(rooms);
+  const units = collection(db, 'equipmentUnits');
+
+  const candidates = [];
+  for (const { room, quantity } of rooms) {
+    const snap = await getDocsFromServer(query(
+      units,
+      where('typeId', '==', type.id),
+      where('status', '==', 'available'),
+      where('homeRoom', '==', room),
+      limit(quantity)
+    ));
+    if (snap.size < quantity) {
+      throw new Error(
+        `Room ${room} only has ${snap.size} available to remove ` +
+        '(checked-out units can’t be removed until they’re returned).'
+      );
+    }
+    candidates.push(...snap.docs);
+  }
+
+  const typeRef = doc(db, 'equipmentTypes', type.id);
+  return runTransaction(db, async (tx) => {
+    const typeSnap = await tx.get(typeRef);
+    if (!typeSnap.exists()) throw new Error(TYPE_GONE_MSG);
+    const fresh = await Promise.all(candidates.map((d) => tx.get(d.ref)));
+    if (fresh.some((s) => !s.exists() || s.data().status !== 'available')) {
+      throw new Error(UNITS_CHANGED_MSG);
+    }
+    const unitsVersion = (typeSnap.data().unitsVersion || 0) + 1;
+
+    for (const s of fresh) tx.delete(s.ref);
+    tx.update(typeRef, { unitsVersion: increment(1) });
+    tx.set(doc(collection(db, 'inventoryLog')), logEntry({ action: 'remove-units', type, rooms, actor }));
+    return { unitsVersion };
+  });
+}
+
+/**
+ * Delete an equipment type and every one of its units. Refused while any
+ * unit is checked out — the active checkout would otherwise point at units
+ * that no longer exist.
+ *
+ * After the transaction, one sweep deletes any available units that were
+ * added between the unit query and the commit (a transaction can't run
+ * queries, so those wouldn't have been in its read set).
+ */
+export async function deleteEquipmentType({ type, actor }) {
+  const units = collection(db, 'equipmentUnits');
+  const unitSnap = await getDocsFromServer(query(units, where('typeId', '==', type.id)));
+
+  const out = unitSnap.docs.filter((d) => d.data().status !== 'available').length;
+  if (out > 0) {
+    throw new Error(
+      `${out} unit${out === 1 ? ' is' : 's are'} still checked out. ` +
+      'This type can be deleted once everything has been returned.'
+    );
+  }
+  if (unitSnap.size > MAX_UNITS_PER_CHANGE) {
+    throw new Error(
+      `This type has ${unitSnap.size} units — remove some first ` +
+      `(at most ${MAX_UNITS_PER_CHANGE} can be deleted at once).`
+    );
+  }
+
+  const byRoom = new Map();
+  for (const d of unitSnap.docs) {
+    const room = d.data().homeRoom ?? '';
+    byRoom.set(room, (byRoom.get(room) || 0) + 1);
+  }
+  const rooms = [...byRoom.entries()].map(([room, quantity]) => ({ room, quantity }));
+
+  const typeRef = doc(db, 'equipmentTypes', type.id);
+  await runTransaction(db, async (tx) => {
+    const typeSnap = await tx.get(typeRef);
+    if (!typeSnap.exists()) throw new Error(TYPE_GONE_MSG);
+    const fresh = await Promise.all(unitSnap.docs.map((d) => tx.get(d.ref)));
+    if (fresh.some((s) => s.exists() && s.data().status !== 'available')) {
+      throw new Error(UNITS_CHANGED_MSG);
+    }
+
+    for (const s of fresh) if (s.exists()) tx.delete(s.ref);
+    tx.delete(typeRef);
+    tx.set(doc(collection(db, 'inventoryLog')), logEntry({ action: 'delete-type', type, rooms, actor }));
+  });
+
+  // The type is already gone at this point, so a failed sweep must not
+  // surface as "delete failed" — log it and move on.
+  try {
+    const strays = await getDocsFromServer(query(
+      units,
+      where('typeId', '==', type.id),
+      where('status', '==', 'available')
+    ));
+    if (!strays.empty) {
+      await runTransaction(db, async (tx) => {
+        strays.docs.slice(0, 500).forEach((d) => tx.delete(d.ref));
+      });
+    }
+  } catch (err) {
+    console.warn(`Stray-unit sweep after deleting type ${type.id} failed:`, err);
+  }
 }

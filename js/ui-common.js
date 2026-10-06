@@ -1,6 +1,6 @@
 // Shared UI helpers for the inventory pages: HTML escaping, toasts,
 // section accent colors, count caches, and the lazy count-fetch pool.
-import { getUnitCounts, getUserProfile } from './firestore.js?v=10';
+import { getUnitCounts, getUserProfile } from './firestore.js?v=11';
 
 export function esc(value) {
   return String(value ?? '')
@@ -71,7 +71,8 @@ const TYPES_KEY = 'eos:types:v1';
 
 export function saveTypesToSession(types) {
   try {
-    const slim = types.map(({ id, name, section, category }) => ({ id, name, section, category }));
+    const slim = types.map(({ id, name, section, category, unitsVersion }) =>
+      ({ id, name, section, category, unitsVersion: unitsVersion || 0 }));
     sessionStorage.setItem(TYPES_KEY, JSON.stringify({ savedAt: Date.now(), types: slim }));
   } catch { /* storage unavailable — section page falls back to a fetch */ }
 }
@@ -84,9 +85,27 @@ export function loadTypesFromSession() {
   return null;
 }
 
+/** Add or replace one type in the sessionStorage handoff (after create / add / remove). */
+export function upsertTypeInSession(type) {
+  const types = loadTypesFromSession();
+  if (!types) return;
+  const i = types.findIndex((t) => t.id === type.id);
+  if (i === -1) types.push(type);
+  else types[i] = { ...types[i], ...type };
+  saveTypesToSession(types);
+}
+
+/** Drop one type from the sessionStorage handoff (after it was deleted). */
+export function removeTypeFromSession(typeId) {
+  const types = loadTypesFromSession();
+  if (types) saveTypesToSession(types.filter((t) => t.id !== typeId));
+}
+
 // ── Total-unit cache (localStorage, 24h TTL) ──
-// Totals only change when units are added/removed, never on checkout.
-const TOTALS_KEY = 'eos:typeTotals:v1';
+// Totals only change when units are added/removed, never on checkout. Each
+// entry remembers the type's unitsVersion it was counted at; a type whose
+// version has moved on (someone added or removed units) misses the cache.
+const TOTALS_KEY = 'eos:typeTotals:v2';
 const TOTALS_TTL_MS = 24 * 60 * 60 * 1000;
 const totalsMap = loadTotals();
 let totalsSaveTimer = null;
@@ -111,6 +130,21 @@ function saveTotalsSoon() {
       );
     } catch { /* storage full — totals just re-fetch next session */ }
   }, 1000);
+}
+
+function getCachedTotal(typeId, version) {
+  const entry = totalsMap.get(typeId);
+  return entry && entry.v === version ? entry.t : undefined;
+}
+
+/**
+ * Forget both cached counts for one type, so the next request re-reads
+ * them. Call after adding or removing units.
+ */
+export function forgetCachedCounts(typeId) {
+  totalsMap.delete(typeId);
+  saveTotalsSoon();
+  invalidateCachedAvail(typeId);
 }
 
 // ── Availability cache (sessionStorage, 5 min TTL) ──
@@ -164,14 +198,20 @@ export function countsHtml(counts) {
  * aggregations, 1 read each). onResult(typeId, counts) fires for every
  * resolution, including cache hits and errors ({ error: true }).
  * isStillNeeded(typeId) lets the page drop queued work that scrolled away.
+ * `version` is the type's unitsVersion; a cached total from an older
+ * version is ignored.
  */
 export function createCountPool({ onResult, isStillNeeded = () => true, concurrency = 6 }) {
   const results = new Map(); // typeId -> { available, total } | { error: true }
   const inflight = new Set();
+  const versions = new Map(); // typeId -> unitsVersion the request was made at
   const queue = [];
   let active = 0;
 
-  function request(typeId) {
+  function request(typeId, version = 0) {
+    // Units were added/removed since this result was fetched — refetch.
+    if (versions.has(typeId) && versions.get(typeId) !== version) results.delete(typeId);
+    versions.set(typeId, version);
     if (results.has(typeId) && !results.get(typeId).error) {
       onResult(typeId, results.get(typeId));
       return;
@@ -179,7 +219,7 @@ export function createCountPool({ onResult, isStillNeeded = () => true, concurre
     if (inflight.has(typeId)) return;
 
     const cachedAvail = getCachedAvail(typeId);
-    const cachedTotal = totalsMap.get(typeId);
+    const cachedTotal = getCachedTotal(typeId, version);
     if (cachedAvail !== undefined && cachedTotal !== undefined) {
       results.set(typeId, { available: cachedAvail, total: cachedTotal });
       onResult(typeId, results.get(typeId));
@@ -191,9 +231,9 @@ export function createCountPool({ onResult, isStillNeeded = () => true, concurre
     pump();
   }
 
-  function retry(typeId) {
+  function retry(typeId, version = versions.get(typeId) || 0) {
     results.delete(typeId);
-    request(typeId);
+    request(typeId, version);
   }
 
   function pump() {
@@ -213,12 +253,21 @@ export function createCountPool({ onResult, isStillNeeded = () => true, concurre
   }
 
   async function fetchOne(typeId) {
+    const version = versions.get(typeId) || 0;
     try {
-      const knownTotal = totalsMap.get(typeId);
+      const knownTotal = getCachedTotal(typeId, version);
       const res = await getUnitCounts(typeId, knownTotal === undefined);
+      // Units were added/removed while this was in flight: these numbers
+      // predate the change, so don't cache them — fetch again instead.
+      // setTimeout (not a microtask) so pump()'s finally has cleared the
+      // in-flight flag first; otherwise request() would bail out.
+      if ((versions.get(typeId) || 0) !== version) {
+        setTimeout(() => request(typeId, versions.get(typeId) || 0), 0);
+        return;
+      }
       const total = knownTotal !== undefined ? knownTotal : res.total;
       if (res.total !== undefined) {
-        totalsMap.set(typeId, res.total);
+        totalsMap.set(typeId, { t: res.total, v: version });
         saveTotalsSoon();
       }
       setCachedAvail(typeId, res.available);
@@ -230,5 +279,11 @@ export function createCountPool({ onResult, isStillNeeded = () => true, concurre
     onResult(typeId, results.get(typeId));
   }
 
-  return { request, retry, get: (typeId) => results.get(typeId) };
+  return {
+    request,
+    retry,
+    get: (typeId) => results.get(typeId),
+    /** Drop the in-memory result too (e.g. a type was deleted). */
+    forget: (typeId) => { results.delete(typeId); versions.delete(typeId); },
+  };
 }

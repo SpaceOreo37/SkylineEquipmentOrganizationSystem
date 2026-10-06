@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Skyline EOS — Section</title>
-  <link rel="stylesheet" href="../styles.css?v=10">
+  <link rel="stylesheet" href="../styles.css?v=11">
 </head>
 <body>
 
@@ -19,7 +19,10 @@
   <main>
     <div class="page-head">
       <a class="back-btn" href="../inventory.html">← All sections</a>
-      <h2 id="section-title">Section</h2>
+      <div class="page-head__row">
+        <h2 id="section-title">Section</h2>
+        <button type="button" id="add-type-btn" class="btn-secondary btn-secondary--sm" hidden>+ Add equipment type</button>
+      </div>
     </div>
 
     <p id="section-status" class="status">Loading equipment…</p>
@@ -29,6 +32,6 @@
   <div id="toast" class="toast" hidden></div>
 
   <!-- Bump ?v= when page structure and script change together (cache busting) -->
-  <script type="module" src="../js/section.js?v=10"></script>
+  <script type="module" src="../js/section.js?v=11"></script>
 </body>
 </html>

@@ -1032,6 +1032,332 @@ form textarea:focus {
   z-index: 100;
 }
 
+/* ── Inventory management (manage + add-type dialogs) ── */
+
+.page-head__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+}
+
+.type-row__manage {
+  padding: 0.375rem 0.875rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  font-family: inherit;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.type-row__manage:hover {
+  background: var(--bg);
+  border-color: var(--text-muted);
+}
+
+.btn-danger,
+.btn-danger-outline {
+  display: inline-block;
+  padding: 0.625rem 1.25rem;
+  border-radius: var(--radius);
+  font-size: 1rem;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.btn-danger {
+  background: var(--error);
+  color: #fff;
+  border: 1px solid var(--error);
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+.btn-danger-outline {
+  background: var(--surface);
+  color: var(--error);
+  border: 1px solid #fca5a5;
+}
+
+.btn-danger-outline:hover:not(:disabled) {
+  background: var(--red-bg);
+}
+
+.btn-primary:disabled,
+.btn-secondary:disabled,
+.btn-danger:disabled,
+.btn-danger-outline:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 0.875rem;
+  color: var(--primary);
+  cursor: pointer;
+}
+
+.link-btn:hover {
+  text-decoration: underline;
+}
+
+.modal {
+  width: min(480px, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  margin: auto;
+  padding: 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+  overflow-y: auto;
+}
+
+.modal--wide {
+  width: min(560px, calc(100vw - 2rem));
+}
+
+.modal--confirm {
+  width: min(420px, calc(100vw - 2rem));
+}
+
+.modal::backdrop {
+  background: rgba(17, 24, 39, 0.45);
+}
+
+.modal__title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+  margin-bottom: 0.25rem;
+}
+
+.modal__subtitle {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+}
+
+.modal__body p,
+.modal__form > p {
+  margin-top: 0.75rem;
+}
+
+.modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+}
+
+/* The global form styles are written for the sign-in card; inside dialogs
+   the action buttons sit in a row instead of stretching full width. */
+.modal .modal__actions button {
+  display: inline-block;
+  width: auto;
+  margin-top: 0;
+  padding: 0.5rem 1rem;
+  font-size: 0.9375rem;
+}
+
+.modal .modal__actions .btn-danger {
+  background: var(--error);
+}
+
+.modal .modal__actions .btn-danger:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+.modal form label {
+  margin-top: 1rem;
+}
+
+.modal input[type="text"],
+.modal input[type="number"] {
+  display: block;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 1rem;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--surface);
+  outline: none;
+}
+
+.modal input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(26, 86, 219, 0.12);
+}
+
+.modal input:disabled {
+  background: var(--bg);
+  color: var(--text-muted);
+}
+
+.field-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-top: 1rem;
+  margin-bottom: 0.3rem;
+}
+
+.modal__form > .field-label:first-child {
+  margin-top: 0.75rem;
+}
+
+.field-hint {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  margin-top: 0.375rem;
+}
+
+.optional {
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.muted {
+  color: var(--text-muted);
+}
+
+.room-editor__head,
+.room-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 2rem;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.room-editor__head {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-bottom: 0.25rem;
+}
+
+.room-row {
+  margin-bottom: 0.5rem;
+}
+
+.room-row__remove {
+  width: 2rem;
+  height: 2rem;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--text-muted);
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.room-row__remove:hover {
+  background: var(--bg);
+  color: var(--error);
+}
+
+.room-table {
+  width: 100%;
+  margin-top: 0.75rem;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+}
+
+.room-table th,
+.room-table td {
+  padding: 0.4rem 0.5rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.room-table thead th {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Row headers (room numbers, Total) read as body text, not as the small
+   grey uppercase column headings the global th style gives them. */
+.room-table tbody th,
+.room-table tfoot th {
+  font-size: inherit;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--text);
+  background: none;
+}
+
+.room-table tfoot th,
+.room-table tfoot td {
+  font-weight: 600;
+  border-bottom: none;
+}
+
+.room-table tbody tr:last-child th,
+.room-table tbody tr:last-child td {
+  border-bottom: 1px solid var(--border);
+}
+
+.room-table--remove input {
+  max-width: 5.5rem;
+  padding: 0.3rem 0.5rem;
+}
+
+.remove-total {
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.manage-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.manage-actions button {
+  padding: 0.5rem 1rem;
+  font-size: 0.9375rem;
+}
+
+.flash {
+  margin-top: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  color: var(--green-fg);
+  background: var(--green-bg);
+  border-radius: var(--radius);
+}
+
+.confirm-list {
+  margin: 0.5rem 0 0 1.25rem;
+  font-size: 0.9375rem;
+}
+
+.modal .error {
+  margin-top: 0.75rem;
+}
+
 /* The department rows' fixed tracks need ~700px before the equipment name is
    squeezed. Below that, drop the table layout and let the row wrap. */
 @media (max-width: 720px) {

@@ -1,8 +1,8 @@
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js';
-import { auth } from './firebase-init.js?v=10';
-import { signOut } from './auth.js?v=10';
-import { subscribeActiveCheckouts, returnEquipment } from './firestore.js?v=10';
-import { esc, showToast, readProfileFromSession, invalidateCachedAvail } from './ui-common.js?v=10';
+import { auth } from './firebase-init.js?v=11';
+import { signOut } from './auth.js?v=11';
+import { subscribeActiveCheckouts, returnEquipment } from './firestore.js?v=11';
+import { esc, showToast, readProfileFromSession, invalidateCachedAvail } from './ui-common.js?v=11';
 
 const statusEl = document.getElementById('dashboard-status');
 const myEl = document.getElementById('my-checkouts');

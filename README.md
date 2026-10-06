@@ -28,6 +28,7 @@ js/
   section.js          — sections/section.html
   checkout.js         — checkout.html
   dashboard.js        — dashboard.html
+  manage.js           — add / remove units, create / delete types (dialogs)
 firestore.rules       — paste into Firebase console → Firestore → Rules
 ```
 
@@ -96,6 +97,12 @@ Equipment is modelled in two collections: one document per *type* of thing
 | `name`     | string | e.g. `"Bunsen Burner"`           |
 | `section`  | string | e.g. `"Chemistry"` — groups the inventory page |
 | `category` | string | optional sub-grouping            |
+| `createdAt`    | timestamp | set on create                |
+| `unitsVersion` | number    | bumped on every unit add/remove; absent = 0 |
+
+`unitsVersion` is how other teachers' browsers learn that a type's total
+changed: unit totals are cached in localStorage for 24h, keyed by this
+version, and the live equipmentTypes listener delivers the new number.
 
 ### `equipmentUnits` collection
 
@@ -104,10 +111,42 @@ One document per physical item.
 | Field        | Type   | Notes                                  |
 |--------------|--------|----------------------------------------|
 | `typeId`     | string | doc ID from `equipmentTypes`           |
+| `typeName`   | string | denormalised type name                 |
 | `status`     | string | `"available"` \| `"checked-out"`       |
 | `homeRoom`   | string | room the unit normally lives in        |
 | `assignedTo` | string | teacher uid while checked out, else absent |
 | `checkoutId` | string | doc ID from `checkouts` while out      |
+
+### Managing inventory
+
+Any signed-in teacher can create a type ("+ Add equipment type" on the
+Inventory or a section page), or open **Manage** on a type's row on its
+section page to add units to rooms, remove units from chosen rooms, or
+delete the type. Rules enforced in `firestore.js`:
+
+- Room numbers must be 4 digits starting with 1 or 2 (`ROOM_RE`).
+- Only *available* units can be removed; a type can't be deleted while any
+  of its units are checked out.
+- At most 400 units per change, so each change fits in one atomic batch /
+  transaction (Firestore's limit is 500 writes).
+- Removing and deleting always ask for a second confirmation.
+
+### `inventoryLog` collection
+
+One doc per inventory change, written in the same batch/transaction as the
+change itself. Not shown in the app yet — browse it in the Firebase console.
+
+| Field         | Type      | Notes                                                  |
+|---------------|-----------|--------------------------------------------------------|
+| `action`      | string    | `"create-type"` \| `"add-units"` \| `"remove-units"` \| `"delete-type"` |
+| `typeId`      | string    | doc ID from `equipmentTypes`                           |
+| `typeName`    | string    |                                                        |
+| `section`     | string    |                                                        |
+| `rooms`       | array     | `[{ room, quantity }]`                                 |
+| `quantity`    | number    | total units added/removed                              |
+| `teacherUid`  | string    | who made the change                                    |
+| `teacherName` | string    |                                                        |
+| `at`          | timestamp | `serverTimestamp()`                                    |
 
 ### `checkouts` collection
 
